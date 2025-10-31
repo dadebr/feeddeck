@@ -84,10 +84,15 @@ class SettingsRepository {
           googleClientIdEnv != '') {
         /// Store the values provided during the build time within the
         /// [SettingsRepository] and use them to initialize the Supabase client.
+        ///
+        /// Also set the [subscriptionEnabled] variable to `false`, so that the
+        /// user can not subscribe to FeedDeck Premium.
         supabaseUrl = supabaseUrlEnv;
         supabaseAnonKey = supabaseAnonKeyEnv;
         supabaseSiteUrl = supabaseSiteUrlEnv;
         googleClientId = googleClientIdEnv;
+
+        subscriptionEnabled = false;
 
         await Supabase.initialize(
           url: supabaseUrlEnv,
