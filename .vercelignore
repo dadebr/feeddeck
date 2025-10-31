@@ -1,0 +1,46 @@
+# Git
+.git
+.github
+.gitignore
+.gitattributes
+
+# Supabase (backend - não precisa no Vercel)
+supabase/
+
+# Landing page (não precisa no deploy do app)
+landing/
+
+# Documentação
+*.md
+!DEPLOY_CLOUD.md
+docs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Flutter build cache (exceto web)
+app/build/ios/
+app/build/android/
+app/build/linux/
+app/build/macos/
+app/build/windows/
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+
+# Outros
+node_modules/
+.env
+.env.local
+.env.*.local
