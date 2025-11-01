@@ -40,43 +40,21 @@ class ColumnLayoutSources extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.all(Radius.circular(24)),
-                      border: Border.all(
-                        color: Colors.transparent,
-                        width: 4,
-                      ),
-                    ),
-                    child: SourceIcon(
-                      type: source.type,
-                      icon: source.icon,
-                      size: 48,
-                    ),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.all(Radius.circular(24)),
+                  border: Border.all(
+                    color: Colors.transparent,
+                    width: 4,
                   ),
-                  if (source.isFavorite)
-                    Positioned(
-                      top: -2,
-                      right: -2,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: Constants.surface,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.star,
-                          size: 14,
-                          color: Constants.primary,
-                        ),
-                      ),
-                    ),
-                ],
+                ),
+                child: SourceIcon(
+                  type: source.type,
+                  icon: source.icon,
+                  size: 48,
+                ),
               ),
               Container(
                 constraints: const BoxConstraints(minWidth: 48, maxWidth: 48),

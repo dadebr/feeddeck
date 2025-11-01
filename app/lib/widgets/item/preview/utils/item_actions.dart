@@ -10,6 +10,7 @@ import 'package:feeddeck/models/item.dart';
 import 'package:feeddeck/repositories/items_repository.dart';
 import 'package:feeddeck/utils/constants.dart';
 import 'package:feeddeck/utils/openurl.dart';
+import 'package:feeddeck/widgets/item/utils/item_category_picker.dart';
 
 /// The [ItemActions] widget provides an actions menu for an item, which can be
 /// used to quickly mark an item as read or unread and to add or remove a
@@ -69,6 +70,27 @@ class _ItemActionsState extends State<ItemActions> {
     try {
       await openUrl(widget.item.link);
     } catch (_) {}
+  }
+
+  /// [_showCategoryDialog] shows a dialog that allows the user to set or
+  /// change the category for this item.
+  Future<void> _showCategoryDialog(BuildContext context) async {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return ItemCategoryPicker(
+          currentCategory: widget.item.category,
+          onCategorySelected: (String? category) async {
+            try {
+              await Provider.of<ItemsRepository>(
+                context,
+                listen: false,
+              ).updateCategory(widget.item.id, category);
+            } catch (_) {}
+          },
+        );
+      },
+    );
   }
 
   /// [_getTapPositionLarge] set the [_tapPosition] which will be used for the
@@ -135,6 +157,17 @@ class _ItemActionsState extends State<ItemActions> {
                 : const Text('Add Bookmark'),
           ),
         ),
+        PopupMenuItem(
+          value: 'category',
+          child: ListTile(
+            leading: const Icon(
+              Icons.label_outline,
+            ),
+            title: widget.item.category != null
+                ? Text('Category: ${widget.item.category}')
+                : const Text('Set Category'),
+          ),
+        ),
         const PopupMenuItem(
           value: 'openlink',
           child: ListTile(
@@ -156,6 +189,11 @@ class _ItemActionsState extends State<ItemActions> {
       case 'bookmark':
         if (mounted) {
           await _bookmark(context);
+        }
+        break;
+      case 'category':
+        if (mounted) {
+          await _showCategoryDialog(context);
         }
         break;
       case 'openlink':
@@ -234,6 +272,22 @@ class _ItemActionsState extends State<ItemActions> {
                   title: widget.item.isBookmarked
                       ? const Text('Remove Bookmark')
                       : const Text('Add Bookmark'),
+                ),
+                const Divider(
+                  color: Constants.dividerColor,
+                  height: 1,
+                  thickness: 1,
+                ),
+                ListTile(
+                  mouseCursor: SystemMouseCursors.click,
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    _showCategoryDialog(mainContext);
+                  },
+                  leading: const Icon(Icons.label_outline),
+                  title: widget.item.category != null
+                      ? Text('Category: ${widget.item.category}')
+                      : const Text('Set Category'),
                 ),
                 const Divider(
                   color: Constants.dividerColor,

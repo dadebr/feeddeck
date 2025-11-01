@@ -107,22 +107,6 @@ class ItemsRepository with ChangeNotifier {
     }
   }
 
-  /// [_getFavoriteSourceIds] is a helper function that retrieves the list of
-  /// favorited source IDs from the AppRepository. This is used for smart
-  /// columns to get items from all favorited sources across the deck.
-  Future<List<String>> _getFavoriteSourceIds() async {
-    final appRepository = Provider.of<AppRepository>(_context, listen: false);
-    return await appRepository.getFavoriteSources();
-  }
-
-  /// [_getSourcesByCategory] is a helper function that retrieves the list of
-  /// source IDs with a specific category from the AppRepository. This is used
-  /// for smart columns to get items from sources in a specific category.
-  Future<List<String>> _getSourcesByCategory(String category) async {
-    final appRepository = Provider.of<AppRepository>(_context, listen: false);
-    return await appRepository.getSourcesByCategory(category);
-  }
-
   /// [_getItems] is used to retrieve a list of items from our database, by
   /// using the provided column and filters.
   ///
@@ -135,44 +119,27 @@ class ItemsRepository with ChangeNotifier {
       notifyListeners();
 
       /// We only select the `id`, `sourceId`, `title`, `link`, `media`,
-      /// `description`, `author`, `publishedAt`, `isRead` and `isBookmarked`
-      /// fields from the database. This is done to reduce the amount of data
-      /// which is transferred from the database to the app. Besides that we
-      /// also filter the items by the `id` of the provided [column] or by
-      /// source IDs for smart columns.
+      /// `description`, `author`, `publishedAt`, `isRead`, `isBookmarked`,
+      /// `category` and `tags` fields from the database. This is done to reduce
+      /// the amount of data which is transferred from the database to the app.
+      /// Besides that we also filter the items by the `id` of the provided
+      /// [column] or by item properties for smart columns.
       var filter = Supabase.instance.client
           .from('items')
           .select(
-            'id, sourceId, title, link, media, description, author, options, publishedAt, isRead, isBookmarked',
+            'id, sourceId, title, link, media, description, author, options, publishedAt, isRead, isBookmarked, category, tags',
           );
 
-      /// For smart columns, we get items from filtered sources across the deck
-      /// instead of column-specific sources. For regular columns, we filter by
-      /// columnId as usual.
+      /// For smart columns, we filter items based on their properties
+      /// (favorites or category) across all columns in the deck. For regular
+      /// columns, we filter by columnId as usual.
       if (column.isSmartColumn && column.smartFilter != null) {
-        List<String> sourceIds = [];
-
         if (column.smartFilter!['type'] == 'favorites') {
-          sourceIds = await _getFavoriteSourceIds();
+          filter = filter.eq('isBookmarked', true);
         } else if (column.smartFilter!['type'] == 'category') {
           final category = column.smartFilter!['value'] as String;
-          sourceIds = await _getSourcesByCategory(category);
+          filter = filter.eq('category', category);
         }
-
-        if (sourceIds.isEmpty) {
-          /// If no sources match the filter, return empty list
-          _items = [];
-          _status = ItemsStatus.loadedLast;
-          ItemsRepositoryStore().set(
-            column.identifier(),
-            _status,
-            _filters,
-            _items,
-          );
-          notifyListeners();
-          return;
-        }
-        filter = filter.inFilter('sourceId', sourceIds);
       } else {
         filter = filter.eq('columnId', column.id);
       }
@@ -374,6 +341,52 @@ class ItemsRepository with ChangeNotifier {
       for (var i = 0; i < _items.length; i++) {
         if (_items[i].id == itemId) {
           _items[i].isBookmarked = bookmarked;
+          break;
+        }
+      }
+
+      ItemsRepositoryStore().set(column.id, _status, _filters, _items);
+      notifyListeners();
+    } catch (err) {
+      rethrow;
+    }
+  }
+
+  /// [updateCategory] can be used to set or update the category of an item
+  /// given by its [itemId]. If the [category] value is `null`, the category
+  /// will be removed from the item.
+  Future<void> updateCategory(String itemId, String? category) async {
+    try {
+      await Supabase.instance.client
+          .from('items')
+          .update({'category': category})
+          .eq('id', itemId);
+      for (var i = 0; i < _items.length; i++) {
+        if (_items[i].id == itemId) {
+          _items[i].category = category;
+          break;
+        }
+      }
+
+      ItemsRepositoryStore().set(column.id, _status, _filters, _items);
+      notifyListeners();
+    } catch (err) {
+      rethrow;
+    }
+  }
+
+  /// [updateTags] can be used to set or update the tags of an item given by
+  /// its [itemId]. If the [tags] value is `null` or empty, all tags will be
+  /// removed from the item.
+  Future<void> updateTags(String itemId, List<String>? tags) async {
+    try {
+      await Supabase.instance.client
+          .from('items')
+          .update({'tags': tags})
+          .eq('id', itemId);
+      for (var i = 0; i < _items.length; i++) {
+        if (_items[i].id == itemId) {
+          _items[i].tags = tags;
           break;
         }
       }
