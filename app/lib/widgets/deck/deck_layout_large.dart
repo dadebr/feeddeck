@@ -182,12 +182,41 @@ class _DeckLayoutLargeState extends State<DeckLayoutLarge> {
 
             return Row(children: widgets);
           } else {
-            // Manual resize mode: use Row with SizedBox and resizable dividers
+            // Manual resize mode: each column has resizable dividers on both sides
             final List<Widget> widgets = [];
 
             for (var i = 0; i < columnCount; i++) {
               final column = app.columns[i];
               final columnWidth = _columnWidths[column.id] ?? Constants.columnWidth;
+
+              // Add left divider for this column (resizes previous column when dragged)
+              if (i > 0) {
+                final prevColumn = app.columns[i - 1];
+                widgets.add(
+                  MouseRegion(
+                    cursor: SystemMouseCursors.resizeColumn,
+                    child: GestureDetector(
+                      onHorizontalDragUpdate: (details) {
+                        setState(() {
+                          final currentWidth = _columnWidths[prevColumn.id] ?? Constants.columnWidth;
+                          final newWidth = (currentWidth + details.delta.dx).clamp(200.0, 1000.0);
+                          _columnWidths[prevColumn.id] = newWidth;
+                        });
+                      },
+                      child: Container(
+                        width: Constants.columnSpacing * 3,
+                        color: Colors.transparent,
+                        child: Center(
+                          child: Container(
+                            width: 2,
+                            color: Constants.dividerColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }
 
               // Add the column
               widgets.add(
@@ -216,39 +245,38 @@ class _DeckLayoutLargeState extends State<DeckLayoutLarge> {
                 ),
               );
 
-              // Add resizable divider between ALL columns
-              if (i < columnCount - 1) {
-                widgets.add(
-                  MouseRegion(
-                    cursor: SystemMouseCursors.resizeColumn,
-                    child: GestureDetector(
-                      onHorizontalDragUpdate: (details) {
-                        setState(() {
-                          final currentWidth = _columnWidths[column.id] ?? Constants.columnWidth;
-                          final newWidth = (currentWidth + details.delta.dx).clamp(200.0, 1000.0);
-                          _columnWidths[column.id] = newWidth;
-                        });
-                      },
-                      child: Container(
-                        width: Constants.columnSpacing * 3,
-                        color: Colors.transparent,
-                        child: Center(
-                          child: Container(
-                            width: 2,
-                            color: Constants.dividerColor,
-                          ),
+              // Add right divider for this column (resizes this column when dragged)
+              widgets.add(
+                MouseRegion(
+                  cursor: SystemMouseCursors.resizeColumn,
+                  child: GestureDetector(
+                    onHorizontalDragUpdate: (details) {
+                      setState(() {
+                        final currentWidth = _columnWidths[column.id] ?? Constants.columnWidth;
+                        final newWidth = (currentWidth + details.delta.dx).clamp(200.0, 1000.0);
+                        _columnWidths[column.id] = newWidth;
+                      });
+                    },
+                    child: Container(
+                      width: Constants.columnSpacing * 3,
+                      color: Colors.transparent,
+                      child: Center(
+                        child: Container(
+                          width: 2,
+                          color: Constants.dividerColor,
                         ),
                       ),
                     ),
                   ),
-                );
-              }
+                ),
+              );
             }
 
-            return SingleChildScrollView(
+            return ListView(
+              padding: EdgeInsets.zero,
               scrollDirection: Axis.horizontal,
               controller: _scrollController,
-              child: Row(children: widgets),
+              children: widgets,
             );
           }
         },
