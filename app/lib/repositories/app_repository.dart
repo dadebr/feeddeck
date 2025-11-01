@@ -360,7 +360,7 @@ class AppRepository with ChangeNotifier {
   Future<List<FDSource>> getSources(String columnId) async {
     final data = await Supabase.instance.client
         .from('sources')
-        .select('id, type, title, options, link, icon, isFavorite, category, tags')
+        .select('id, type, title, options, link, icon')
         .eq('columnId', columnId)
         .order('position', ascending: true, nullsFirst: false)
         .order('createdAt', ascending: true);
