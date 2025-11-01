@@ -272,11 +272,17 @@ class _DeckLayoutLargeState extends State<DeckLayoutLarge> {
               );
             }
 
-            return ListView(
-              padding: EdgeInsets.zero,
-              scrollDirection: Axis.horizontal,
+            return Scrollbar(
               controller: _scrollController,
-              children: widgets,
+              thumbVisibility: true,
+              thickness: 8,
+              radius: const Radius.circular(4),
+              child: ListView(
+                padding: EdgeInsets.zero,
+                scrollDirection: Axis.horizontal,
+                controller: _scrollController,
+                children: widgets,
+              ),
             );
           }
         },
