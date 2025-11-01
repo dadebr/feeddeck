@@ -28,6 +28,12 @@ class _DeckLayoutLargeState extends State<DeckLayoutLarge> {
   final AutoScrollController _scrollController = AutoScrollController();
   Widget _drawer = Container();
 
+  /// Map to store custom column widths. Key is column ID, value is width.
+  final Map<String, double> _columnWidths = {};
+
+  /// Whether auto-sizing is enabled (columns fill available width)
+  bool _autoSize = true;
+
   /// [_openDrawer] opens the provided [widget] in the drawer of the scaffold,
   /// by setting the [_drawer] state first and then opening the drawer.
   void _openDrawer(Widget widget) {
@@ -35,6 +41,19 @@ class _DeckLayoutLargeState extends State<DeckLayoutLarge> {
       _drawer = widget;
     });
     _scaffoldKey.currentState?.openDrawer();
+  }
+
+  /// [_getColumnWidth] returns the width for a given column.
+  /// If auto-sizing is enabled, it calculates equal widths for all columns.
+  /// Otherwise, it uses custom widths or falls back to the default width.
+  double _getColumnWidth(String columnId, double availableWidth, int columnCount) {
+    if (_autoSize && columnCount > 0) {
+      // Distribute available width equally among all columns
+      return (availableWidth / columnCount).clamp(200.0, double.infinity);
+    }
+
+    // Return custom width if set, otherwise use default
+    return _columnWidths[columnId] ?? Constants.columnWidth;
   }
 
   /// [_buildDestinations] returns a list of destinations for the
@@ -98,7 +117,6 @@ class _DeckLayoutLargeState extends State<DeckLayoutLarge> {
   /// additional border to the columns for a better seperation.
   Widget _buildColumns() {
     AppRepository app = Provider.of<AppRepository>(context, listen: false);
-    final List<Widget> widgets = [];
 
     if (app.columns.isEmpty) {
       return Expanded(
@@ -123,38 +141,78 @@ class _DeckLayoutLargeState extends State<DeckLayoutLarge> {
       );
     }
 
-    for (var i = 0; i < app.columns.length; i++) {
-      widgets.add(
-        AutoScrollTag(
-          key: ValueKey(app.columns[i].id),
-          controller: _scrollController,
-          index: i,
-          child: Container(
-            width: Constants.columnWidth,
-            decoration: const BoxDecoration(
-              border: Border(
-                right: BorderSide(
-                  color: Colors.black,
-                  width: Constants.columnSpacing,
+    return Expanded(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final availableWidth = constraints.maxWidth;
+          final columnCount = app.columns.length;
+          final List<Widget> widgets = [];
+
+          for (var i = 0; i < columnCount; i++) {
+            final column = app.columns[i];
+            final columnWidth = _getColumnWidth(column.id, availableWidth, columnCount);
+
+            // Add the column
+            widgets.add(
+              AutoScrollTag(
+                key: ValueKey(column.id),
+                controller: _scrollController,
+                index: i,
+                child: Container(
+                  width: columnWidth,
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      right: BorderSide(
+                        color: Colors.black,
+                        width: Constants.columnSpacing,
+                      ),
+                    ),
+                  ),
+                  child: ColumnLayout(
+                    key: ValueKey(column.id),
+                    column: column,
+                    openDrawer: _openDrawer,
+                  ),
                 ),
               ),
-            ),
-            child: ColumnLayout(
-              key: ValueKey(app.columns[i].id),
-              column: app.columns[i],
-              openDrawer: _openDrawer,
-            ),
-          ),
-        ),
-      );
-    }
+            );
 
-    return Expanded(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        scrollDirection: Axis.horizontal,
-        controller: _scrollController,
-        children: widgets,
+            // Add resizable divider between columns (except after the last one)
+            if (!_autoSize && i < columnCount - 1) {
+              widgets.add(
+                MouseRegion(
+                  cursor: SystemMouseCursors.resizeColumn,
+                  child: GestureDetector(
+                    onHorizontalDragUpdate: (details) {
+                      setState(() {
+                        final currentWidth = _columnWidths[column.id] ?? Constants.columnWidth;
+                        final newWidth = (currentWidth + details.delta.dx).clamp(200.0, 1000.0);
+                        _columnWidths[column.id] = newWidth;
+                      });
+                    },
+                    child: Container(
+                      width: Constants.columnSpacing * 3,
+                      color: Colors.transparent,
+                      child: const Center(
+                        child: Container(
+                          width: 2,
+                          color: Constants.dividerColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+          }
+
+          return ListView(
+            padding: EdgeInsets.zero,
+            scrollDirection: Axis.horizontal,
+            controller: _scrollController,
+            children: widgets,
+          );
+        },
       ),
     );
   }
@@ -233,10 +291,10 @@ class _DeckLayoutLargeState extends State<DeckLayoutLarge> {
                         child: const Logo(size: 32.0),
                       ),
 
-                      /// We add two additional items to the navigation rail via
+                      /// We add additional items to the navigation rail via
                       /// the trailing property. These items are used to allow a
-                      /// user to create a new column and to go to the settings
-                      /// of the app.
+                      /// user to create a new column, toggle auto-sizing, and
+                      /// go to the settings of the app.
                       trailing: Expanded(
                         child: Align(
                           alignment: Alignment.bottomCenter,
@@ -245,12 +303,32 @@ class _DeckLayoutLargeState extends State<DeckLayoutLarge> {
                             children: [
                               IconButton(
                                 icon: const Icon(Icons.add),
+                                tooltip: 'Add Column',
                                 onPressed: () {
                                   _openDrawer(const CreateColumn());
                                 },
                               ),
                               IconButton(
+                                icon: Icon(
+                                  _autoSize ? Icons.view_column : Icons.width_full,
+                                  color: _autoSize ? Constants.primary : Constants.onSurface,
+                                ),
+                                tooltip: _autoSize
+                                    ? 'Auto-size enabled (click to resize manually)'
+                                    : 'Manual resize enabled (click for auto-size)',
+                                onPressed: () {
+                                  setState(() {
+                                    _autoSize = !_autoSize;
+                                    if (_autoSize) {
+                                      // Clear custom widths when enabling auto-size
+                                      _columnWidths.clear();
+                                    }
+                                  });
+                                },
+                              ),
+                              IconButton(
                                 icon: const Icon(Icons.settings),
+                                tooltip: 'Settings',
                                 onPressed: () {
                                   Navigator.push(
                                     context,
