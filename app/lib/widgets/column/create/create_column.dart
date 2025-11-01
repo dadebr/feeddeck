@@ -43,8 +43,8 @@ class _CreateColumnState extends State<CreateColumn> {
 
   /// [_createColumn] creates a new column with the user selected name and type.
   /// If the column type is 'favorites', it creates a smart column that shows
-  /// items from all favorited sources. If the column type is 'category', it
-  /// creates a smart column that shows items from sources with the selected
+  /// all bookmarked items across all sources. If the column type is 'category',
+  /// it creates a smart column that shows items tagged with the selected
   /// category. If the column was created the widget is closed. If the creation
   /// of the column failed, an error message is shown.
   Future<void> _createColumn() async {
@@ -208,7 +208,7 @@ class _CreateColumnState extends State<CreateColumn> {
                             ],
                           ),
                           subtitle: const Text(
-                            'Automatically shows items from all favorited sources',
+                            'Automatically shows all bookmarked/favorited items',
                           ),
                           value: 'favorites',
                           groupValue: _columnType,
@@ -231,7 +231,7 @@ class _CreateColumnState extends State<CreateColumn> {
                             ],
                           ),
                           subtitle: const Text(
-                            'Automatically shows items from sources in a specific category',
+                            'Automatically shows items tagged with a specific category',
                           ),
                           value: 'category',
                           groupValue: _columnType,
