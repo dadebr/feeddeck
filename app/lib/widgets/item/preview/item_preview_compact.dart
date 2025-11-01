@@ -82,7 +82,7 @@ class ItemPreviewCompact extends StatelessWidget {
                     _formatTimestamp(item.publishedAt),
                     style: const TextStyle(
                       fontSize: 10,
-                      color: Constants.onSurfaceVariant,
+                      color: Constants.secondaryTextColor,
                     ),
                   ),
                 ),
