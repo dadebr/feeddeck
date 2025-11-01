@@ -8,6 +8,9 @@
 ///     published by a source
 ///   - The [isRead] field is used to define if the user has read the item
 ///   - The [isBookmarked] field is used to define if the user has bookmarked
+///     the item (also serves as favorite/star functionality)
+///   - The [category] field allows user to organize items into categories
+///   - The [tags] field allows user to add multiple tags for flexible organization
 class FDItem {
   String id;
   String sourceId;
@@ -20,6 +23,8 @@ class FDItem {
   int publishedAt;
   bool isRead;
   bool isBookmarked;
+  String? category;
+  List<String>? tags;
 
   FDItem({
     required this.id,
@@ -33,6 +38,8 @@ class FDItem {
     required this.publishedAt,
     required this.isRead,
     required this.isBookmarked,
+    this.category,
+    this.tags,
   });
 
   factory FDItem.fromJson(Map<String, dynamic> data) {
@@ -60,6 +67,14 @@ class FDItem {
           data.containsKey('isBookmarked') && data['isBookmarked'] != null
               ? data['isBookmarked']
               : false,
+      category:
+          data.containsKey('category') && data['category'] != null
+              ? data['category']
+              : null,
+      tags:
+          data.containsKey('tags') && data['tags'] != null
+              ? List<String>.from(data['tags'])
+              : null,
     );
   }
 }

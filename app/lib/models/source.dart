@@ -221,9 +221,6 @@ FDSourceType getSourceTypeFromString(String state) {
 ///   - A [title], [link] and [icon]
 ///   - The [options] are used to define additional values for the selected
 ///     [type] so that we can scrape the correct data
-///   - Optional [isFavorite] flag to mark sources as favorites
-///   - Optional [category] to group sources
-///   - Optional [tags] list for additional categorization
 class FDSource {
   String id;
   FDSourceType type;
@@ -231,9 +228,6 @@ class FDSource {
   FDSourceOptions? options;
   String? link;
   String? icon;
-  bool isFavorite;
-  String? category;
-  List<String>? tags;
 
   FDSource({
     required this.id,
@@ -242,9 +236,6 @@ class FDSource {
     required this.options,
     required this.link,
     required this.icon,
-    this.isFavorite = false,
-    this.category,
-    this.tags,
   });
 
   String get prettyTitle => title.replaceAll(RegExp(r'(?! )\s+| \s+'), ' ');
@@ -266,18 +257,6 @@ class FDSource {
           data.containsKey('icon') && data['icon'] != null
               ? data['icon']
               : null,
-      isFavorite:
-          data.containsKey('isFavorite') && data['isFavorite'] != null
-              ? data['isFavorite']
-              : false,
-      category:
-          data.containsKey('category') && data['category'] != null
-              ? data['category']
-              : null,
-      tags:
-          data.containsKey('tags') && data['tags'] != null
-              ? List<String>.from(data['tags'])
-              : null,
     );
   }
 
@@ -289,9 +268,6 @@ class FDSource {
       'options': options?.toJson(),
       'link': link,
       'icon': icon,
-      'isFavorite': isFavorite,
-      'category': category,
-      'tags': tags,
     };
   }
 
