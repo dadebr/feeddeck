@@ -176,15 +176,15 @@ class _ColumnLayoutHeaderState extends State<ColumnLayoutHeader> {
               icon: Icon(
                 Icons.filter_list,
                 size: 20.0,
-                color: items.filters.stateFilter == ItemStateFilter.unread
+                color: items.stateFilter == ItemStateFilter.unread
                     ? Constants.primary
                     : Constants.onSurface,
               ),
-              tooltip: items.filters.stateFilter == ItemStateFilter.unread
+              tooltip: items.stateFilter == ItemStateFilter.unread
                   ? 'Showing unread only (click to show all)'
                   : 'Showing all items (click for unread only)',
               onPressed: () {
-                if (items.filters.stateFilter == ItemStateFilter.unread) {
+                if (items.stateFilter == ItemStateFilter.unread) {
                   items.filterByState(ItemStateFilter.none);
                 } else {
                   items.filterByState(ItemStateFilter.unread);
