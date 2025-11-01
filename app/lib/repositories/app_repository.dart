@@ -256,13 +256,39 @@ class AppRepository with ChangeNotifier {
     notifyListeners();
   }
 
+  /// [createSmartColumn] is called to create a new smart column in the active
+  /// deck. A smart column automatically aggregates items based on filter criteria.
+  /// The function takes a [name] and [smartFilter] as parameters. The smartFilter
+  /// defines what items should be shown (e.g., {"type": "favorites"} shows items
+  /// from all favorited sources).
+  Future<void> createSmartColumn(
+    String name,
+    Map<String, dynamic> smartFilter,
+  ) async {
+    final data =
+        await Supabase.instance.client.from('columns').insert({
+          'deckId': _activeDeckId,
+          'userId': Supabase.instance.client.auth.currentUser!.id,
+          'name': name,
+          'position': _columns.length,
+          'isSmartColumn': true,
+          'smartFilter': smartFilter,
+        }).select('id, name, position, isSmartColumn, smartFilter');
+
+    final newColumn = List<FDColumn>.from(
+      data.map((column) => FDColumn.fromJson(column)),
+    );
+    _columns.addAll(newColumn);
+    notifyListeners();
+  }
+
   /// [getColumns] is called to get all columns for the deck with the provided
   /// [deckId]. The function calls the Supabase client to get all columns for
   /// the deck. The function returns a list of [FDColumn]s.
   Future<List<FDColumn>> getColumns(String deckId) async {
     final data = await Supabase.instance.client
         .from('columns')
-        .select('id, name, position')
+        .select('id, name, position, isSmartColumn, smartFilter')
         .eq('deckId', deckId)
         .order('position', ascending: true);
     return List<FDColumn>.from(data.map((column) => FDColumn.fromJson(column)));
@@ -334,11 +360,51 @@ class AppRepository with ChangeNotifier {
   Future<List<FDSource>> getSources(String columnId) async {
     final data = await Supabase.instance.client
         .from('sources')
-        .select('id, type, title, options, link, icon')
+        .select('id, type, title, options, link, icon, isFavorite, category, tags')
         .eq('columnId', columnId)
         .order('position', ascending: true, nullsFirst: false)
         .order('createdAt', ascending: true);
     return List<FDSource>.from(data.map((source) => FDSource.fromJson(source)));
+  }
+
+  /// [getFavoriteSources] is called to get all favorited sources for the active
+  /// deck across all columns. This is used for smart columns that show items
+  /// from favorited sources. Returns a list of source IDs.
+  Future<List<String>> getFavoriteSources() async {
+    if (_activeDeckId == null) {
+      return [];
+    }
+
+    final data = await Supabase.instance.client
+        .from('sources')
+        .select('id')
+        .eq('isFavorite', true)
+        .inFilter(
+          'columnId',
+          _columns.map((column) => column.id).toList(),
+        );
+
+    return List<String>.from(data.map((source) => source['id']));
+  }
+
+  /// [getSourcesByCategory] is called to get all sources with a specific category
+  /// for the active deck across all columns. This is used for smart columns that
+  /// show items from sources in a specific category. Returns a list of source IDs.
+  Future<List<String>> getSourcesByCategory(String category) async {
+    if (_activeDeckId == null) {
+      return [];
+    }
+
+    final data = await Supabase.instance.client
+        .from('sources')
+        .select('id')
+        .eq('category', category)
+        .inFilter(
+          'columnId',
+          _columns.map((column) => column.id).toList(),
+        );
+
+    return List<String>.from(data.map((source) => source['id']));
   }
 
   /// [deleteSource] is called to delete a source with the provided [sourceId].
@@ -454,6 +520,94 @@ class AppRepository with ChangeNotifier {
           .update({'position': i})
           .eq('id', _columns[columnIndex].sources[i].id);
     }
+
+    notifyListeners();
+  }
+
+  /// [toggleSourceFavorite] is called to toggle the favorite status of a source
+  /// with the provided [sourceId]. The function updates the source in the database
+  /// and also updates the source in the local state.
+  Future<void> toggleSourceFavorite(String columnId, String sourceId) async {
+    final columnIndex = _columns.indexWhere((column) => column.id == columnId);
+    if (columnIndex == -1) {
+      return;
+    }
+
+    final sourceIndex = _columns[columnIndex].sources.indexWhere(
+      (source) => source.id == sourceId,
+    );
+    if (sourceIndex == -1) {
+      return;
+    }
+
+    final newFavoriteStatus = !_columns[columnIndex].sources[sourceIndex].isFavorite;
+
+    await Supabase.instance.client
+        .from('sources')
+        .update({'isFavorite': newFavoriteStatus})
+        .eq('id', sourceId);
+
+    _columns[columnIndex].sources[sourceIndex].isFavorite = newFavoriteStatus;
+
+    notifyListeners();
+  }
+
+  /// [updateSourceCategory] is called to update the category of a source with
+  /// the provided [sourceId]. The function updates the source in the database
+  /// and also updates the source in the local state.
+  Future<void> updateSourceCategory(
+    String columnId,
+    String sourceId,
+    String? category,
+  ) async {
+    final columnIndex = _columns.indexWhere((column) => column.id == columnId);
+    if (columnIndex == -1) {
+      return;
+    }
+
+    final sourceIndex = _columns[columnIndex].sources.indexWhere(
+      (source) => source.id == sourceId,
+    );
+    if (sourceIndex == -1) {
+      return;
+    }
+
+    await Supabase.instance.client
+        .from('sources')
+        .update({'category': category})
+        .eq('id', sourceId);
+
+    _columns[columnIndex].sources[sourceIndex].category = category;
+
+    notifyListeners();
+  }
+
+  /// [updateSourceTags] is called to update the tags of a source with the
+  /// provided [sourceId]. The function updates the source in the database
+  /// and also updates the source in the local state.
+  Future<void> updateSourceTags(
+    String columnId,
+    String sourceId,
+    List<String>? tags,
+  ) async {
+    final columnIndex = _columns.indexWhere((column) => column.id == columnId);
+    if (columnIndex == -1) {
+      return;
+    }
+
+    final sourceIndex = _columns[columnIndex].sources.indexWhere(
+      (source) => source.id == sourceId,
+    );
+    if (sourceIndex == -1) {
+      return;
+    }
+
+    await Supabase.instance.client
+        .from('sources')
+        .update({'tags': tags})
+        .eq('id', sourceId);
+
+    _columns[columnIndex].sources[sourceIndex].tags = tags;
 
     notifyListeners();
   }

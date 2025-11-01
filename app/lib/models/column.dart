@@ -10,17 +10,24 @@ import 'package:feeddeck/models/source.dart';
 ///   - A list of [sources] which belong to a column, this field is not stored
 ///     in the database and must be retrieved by selecting all sources from the
 ///     sources table where the `columnId` field matches the [id] of the column
+///   - Optional [isSmartColumn] flag to indicate intelligent columns that aggregate
+///     items based on criteria across multiple sources
+///   - Optional [smartFilter] JSON object defining the criteria for smart columns
 class FDColumn {
   String id;
   String name;
   int position;
   List<FDSource> sources;
+  bool isSmartColumn;
+  Map<String, dynamic>? smartFilter;
 
   FDColumn({
     required this.id,
     required this.name,
     required this.position,
     required this.sources,
+    this.isSmartColumn = false,
+    this.smartFilter,
   });
 
   factory FDColumn.fromJson(Map<String, dynamic> data) {
@@ -34,6 +41,14 @@ class FDColumn {
                 data['sources'].map((source) => FDSource.fromJson(source)),
               )
               : [],
+      isSmartColumn:
+          data.containsKey('isSmartColumn') && data['isSmartColumn'] != null
+              ? data['isSmartColumn']
+              : false,
+      smartFilter:
+          data.containsKey('smartFilter') && data['smartFilter'] != null
+              ? Map<String, dynamic>.from(data['smartFilter'])
+              : null,
     );
   }
 

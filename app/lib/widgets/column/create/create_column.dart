@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:feeddeck/repositories/app_repository.dart';
 import 'package:feeddeck/utils/constants.dart';
 import 'package:feeddeck/widgets/general/elevated_button_progress_indicator.dart';
+import 'package:feeddeck/widgets/source/source_category_picker.dart';
 
 /// The [CreateColumn] widget is used to create a new column. The user must
 /// provide a name for the column within the widget. If the column was created
@@ -22,6 +23,8 @@ class _CreateColumnState extends State<CreateColumn> {
   final _nameController = TextEditingController();
   bool _isLoading = false;
   String _error = '';
+  String _columnType = 'normal'; // 'normal', 'favorites', or 'category'
+  String? _selectedCategory;
 
   /// [_validateColumnName] validates the column name provided via the
   /// [TextField] of the [_nameController]. The column name field can not be
@@ -38,20 +41,45 @@ class _CreateColumnState extends State<CreateColumn> {
     return null;
   }
 
-  /// [_createColumn] creates a new column with the user selected name. If the
-  /// column was created the widget is closed. If the creation of the column
-  /// failed, an error message is shown.
+  /// [_createColumn] creates a new column with the user selected name and type.
+  /// If the column type is 'favorites', it creates a smart column that shows
+  /// items from all favorited sources. If the column type is 'category', it
+  /// creates a smart column that shows items from sources with the selected
+  /// category. If the column was created the widget is closed. If the creation
+  /// of the column failed, an error message is shown.
   Future<void> _createColumn() async {
     if (_formKey.currentState != null && _formKey.currentState!.validate()) {
+      // Validate category selection for category columns
+      if (_columnType == 'category' && _selectedCategory == null) {
+        setState(() {
+          _error = 'Please select a category for the smart column';
+        });
+        return;
+      }
+
       setState(() {
         _isLoading = true;
       });
 
       try {
-        await Provider.of<AppRepository>(
+        final appRepository = Provider.of<AppRepository>(
           context,
           listen: false,
-        ).createColumn(_nameController.text);
+        );
+
+        if (_columnType == 'favorites') {
+          await appRepository.createSmartColumn(
+            _nameController.text,
+            {'type': 'favorites'},
+          );
+        } else if (_columnType == 'category') {
+          await appRepository.createSmartColumn(
+            _nameController.text,
+            {'type': 'category', 'value': _selectedCategory},
+          );
+        } else {
+          await appRepository.createColumn(_nameController.text);
+        }
 
         setState(() {
           _isLoading = false;
@@ -145,6 +173,86 @@ class _CreateColumnState extends State<CreateColumn> {
                           validator: (value) => _validateColumnName(value),
                           onFieldSubmitted: (value) => _createColumn(),
                         ),
+                        const SizedBox(height: Constants.spacingMiddle),
+                        const Text(
+                          'Column Type',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: Constants.spacingSmall),
+                        RadioListTile<String>(
+                          title: const Text('Normal Column'),
+                          subtitle: const Text(
+                            'Add sources manually to this column',
+                          ),
+                          value: 'normal',
+                          groupValue: _columnType,
+                          onChanged: (value) {
+                            setState(() {
+                              _columnType = value!;
+                            });
+                          },
+                        ),
+                        RadioListTile<String>(
+                          title: const Row(
+                            children: [
+                              Icon(
+                                Icons.star,
+                                size: 18,
+                                color: Constants.primary,
+                              ),
+                              SizedBox(width: 8),
+                              Text('Favorites Column'),
+                            ],
+                          ),
+                          subtitle: const Text(
+                            'Automatically shows items from all favorited sources',
+                          ),
+                          value: 'favorites',
+                          groupValue: _columnType,
+                          onChanged: (value) {
+                            setState(() {
+                              _columnType = value!;
+                            });
+                          },
+                        ),
+                        RadioListTile<String>(
+                          title: const Row(
+                            children: [
+                              Icon(
+                                Icons.label,
+                                size: 18,
+                                color: Constants.primary,
+                              ),
+                              SizedBox(width: 8),
+                              Text('Category Column'),
+                            ],
+                          ),
+                          subtitle: const Text(
+                            'Automatically shows items from sources in a specific category',
+                          ),
+                          value: 'category',
+                          groupValue: _columnType,
+                          onChanged: (value) {
+                            setState(() {
+                              _columnType = value!;
+                            });
+                          },
+                        ),
+                        if (_columnType == 'category') ...[
+                          const SizedBox(height: Constants.spacingMiddle),
+                          SourceCategoryPicker(
+                            initialCategory: _selectedCategory,
+                            onCategoryChanged: (category) {
+                              setState(() {
+                                _selectedCategory = category;
+                                _error = ''; // Clear error when category is selected
+                              });
+                            },
+                          ),
+                        ],
                       ],
                     ),
                   ),

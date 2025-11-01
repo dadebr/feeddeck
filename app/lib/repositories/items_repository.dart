@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:collection/collection.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:feeddeck/models/column.dart';
 import 'package:feeddeck/models/item.dart';
 import 'package:feeddeck/models/source.dart';
+import 'package:feeddeck/repositories/app_repository.dart';
 
 /// [ItemsFilters] is a class which contains all filters for the items in a
 /// [ItemsRepository]. These filter can be used by a user to filter the items
@@ -56,15 +58,17 @@ int now() {
 }
 
 /// [ItemsRepository] is used to manage the items in a column. Therefor we need
-/// the [column] to which the items belong to. When the repository is
-/// initialized we have to call the [_init] function to load the items for the
-/// provided column.
+/// the [column] to which the items belong to and a [context] to access the
+/// AppRepository for smart columns. When the repository is initialized we have
+/// to call the [_init] function to load the items for the provided column.
 class ItemsRepository with ChangeNotifier {
-  ItemsRepository({required this.column}) {
+  ItemsRepository({required this.column, required BuildContext context})
+      : _context = context {
     _init();
   }
 
   final FDColumn column;
+  final BuildContext _context;
   ItemsStatus _status = ItemsStatus.loaded;
   List<FDItem> _items = [];
   ItemsFilters _filters = ItemsFilters(
@@ -103,6 +107,22 @@ class ItemsRepository with ChangeNotifier {
     }
   }
 
+  /// [_getFavoriteSourceIds] is a helper function that retrieves the list of
+  /// favorited source IDs from the AppRepository. This is used for smart
+  /// columns to get items from all favorited sources across the deck.
+  Future<List<String>> _getFavoriteSourceIds() async {
+    final appRepository = Provider.of<AppRepository>(_context, listen: false);
+    return await appRepository.getFavoriteSources();
+  }
+
+  /// [_getSourcesByCategory] is a helper function that retrieves the list of
+  /// source IDs with a specific category from the AppRepository. This is used
+  /// for smart columns to get items from sources in a specific category.
+  Future<List<String>> _getSourcesByCategory(String category) async {
+    final appRepository = Provider.of<AppRepository>(_context, listen: false);
+    return await appRepository.getSourcesByCategory(category);
+  }
+
   /// [_getItems] is used to retrieve a list of items from our database, by
   /// using the provided column and filters.
   ///
@@ -118,13 +138,44 @@ class ItemsRepository with ChangeNotifier {
       /// `description`, `author`, `publishedAt`, `isRead` and `isBookmarked`
       /// fields from the database. This is done to reduce the amount of data
       /// which is transferred from the database to the app. Besides that we
-      /// also filter the items by the `id` of the provided [column].
+      /// also filter the items by the `id` of the provided [column] or by
+      /// source IDs for smart columns.
       var filter = Supabase.instance.client
           .from('items')
           .select(
             'id, sourceId, title, link, media, description, author, options, publishedAt, isRead, isBookmarked',
-          )
-          .eq('columnId', column.id);
+          );
+
+      /// For smart columns, we get items from filtered sources across the deck
+      /// instead of column-specific sources. For regular columns, we filter by
+      /// columnId as usual.
+      if (column.isSmartColumn && column.smartFilter != null) {
+        List<String> sourceIds = [];
+
+        if (column.smartFilter!['type'] == 'favorites') {
+          sourceIds = await _getFavoriteSourceIds();
+        } else if (column.smartFilter!['type'] == 'category') {
+          final category = column.smartFilter!['value'] as String;
+          sourceIds = await _getSourcesByCategory(category);
+        }
+
+        if (sourceIds.isEmpty) {
+          /// If no sources match the filter, return empty list
+          _items = [];
+          _status = ItemsStatus.loadedLast;
+          ItemsRepositoryStore().set(
+            column.identifier(),
+            _status,
+            _filters,
+            _items,
+          );
+          notifyListeners();
+          return;
+        }
+        filter = filter.inFilter('sourceId', sourceIds);
+      } else {
+        filter = filter.eq('columnId', column.id);
+      }
 
       /// If the user selected a source, we filter the items by the id of the
       /// selected source which is stored in the [_filters.sourceIdFilter]

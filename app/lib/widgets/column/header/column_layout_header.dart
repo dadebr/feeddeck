@@ -169,6 +169,29 @@ class _ColumnLayoutHeaderState extends State<ColumnLayoutHeader> {
                   : () => items.reload(),
             ),
 
+            /// The unread filter toggle button is used to quickly switch between
+            /// showing only unread items or all items. The button is highlighted
+            /// when the unread filter is active.
+            IconButton(
+              icon: Icon(
+                Icons.filter_list,
+                size: 20.0,
+                color: items.filters.stateFilter == ItemStateFilter.unread
+                    ? Constants.primary
+                    : Constants.onSurface,
+              ),
+              tooltip: items.filters.stateFilter == ItemStateFilter.unread
+                  ? 'Showing unread only (click to show all)'
+                  : 'Showing all items (click for unread only)',
+              onPressed: () {
+                if (items.filters.stateFilter == ItemStateFilter.unread) {
+                  items.filterByState(ItemStateFilter.none);
+                } else {
+                  items.filterByState(ItemStateFilter.unread);
+                }
+              },
+            ),
+
             /// The mark all items as read / unread will call the
             /// [_markAllAsReadUnread] function to mark all items as read or
             /// unread. If the list contains a unread items we display the
