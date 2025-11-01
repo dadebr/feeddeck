@@ -42,8 +42,8 @@ class _ColumnLayoutState extends State<ColumnLayout> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: ItemsRepository(column: widget.column, context: context),
+    return ChangeNotifierProvider(
+      create: (_) => ItemsRepository(column: widget.column, context: context),
       child: Column(
         children: [
           ColumnLayoutHeader(
