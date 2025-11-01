@@ -15,16 +15,21 @@ import 'package:feeddeck/widgets/source/source_icon.dart';
 ///
 ///   - Reload all items in the column
 ///   - Mark all items as read / unread
+///   - Toggle view mode (card vs list)
 ///   - Show / hide settings of the column
 class ColumnLayoutHeader extends StatefulWidget {
   const ColumnLayoutHeader({
     super.key,
     required this.column,
     required this.openDrawer,
+    required this.isCardView,
+    required this.onToggleViewMode,
   });
 
   final FDColumn column;
   final void Function(Widget widget)? openDrawer;
+  final bool isCardView;
+  final VoidCallback onToggleViewMode;
 
   @override
   State<ColumnLayoutHeader> createState() => _ColumnLayoutHeaderState();
@@ -194,6 +199,20 @@ class _ColumnLayoutHeaderState extends State<ColumnLayoutHeader> {
               onPressed: items.items.isEmpty || _isLoadingMarkAllAsReadUnread
                   ? null
                   : () => _markAllAsReadUnread(),
+            ),
+
+            /// The view mode toggle button switches between card view (with
+            /// thumbnails and full content) and compact list view (headlines only).
+            IconButton(
+              icon: Icon(
+                widget.isCardView ? Icons.view_agenda : Icons.view_list,
+                size: 20.0,
+                color: widget.isCardView ? Constants.onSurface : Constants.primary,
+              ),
+              tooltip: widget.isCardView
+                  ? 'Card view (click for list view)'
+                  : 'List view (click for card view)',
+              onPressed: widget.onToggleViewMode,
             ),
 
             /// The settings button is used to show / hide the settings for the

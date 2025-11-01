@@ -7,13 +7,22 @@ import 'package:feeddeck/utils/constants.dart';
 import 'package:feeddeck/widgets/column/list/column_layout_load_more.dart';
 import 'package:feeddeck/widgets/column/list/column_layout_sources.dart';
 import 'package:feeddeck/widgets/item/preview/item_preview.dart';
+import 'package:feeddeck/widgets/item/preview/item_preview_compact.dart';
 
 /// The [ColumnLayoutList] displays the list of all items for a column. The list
 /// also contains all column sources as the first item ([ColumnLayoutSources]
 /// widget) and the load more button as the last item ([ColumnLayoutLoadMore]
 /// widget).
+///
+/// The [isCardView] parameter determines whether to show items in card view
+/// (with thumbnails and full content) or compact list view (headlines only).
 class ColumnLayoutList extends StatelessWidget {
-  const ColumnLayoutList({super.key});
+  const ColumnLayoutList({
+    super.key,
+    this.isCardView = true,
+  });
+
+  final bool isCardView;
 
   @override
   Widget build(BuildContext context) {
@@ -72,10 +81,18 @@ class ColumnLayoutList extends StatelessWidget {
             );
           }
 
-          return ItemPreview(
-            key: ValueKey(items.items[index - 1].id),
-            item: items.items[index - 1],
-          );
+          // Use compact view or card view based on isCardView parameter
+          if (isCardView) {
+            return ItemPreview(
+              key: ValueKey(items.items[index - 1].id),
+              item: items.items[index - 1],
+            );
+          } else {
+            return ItemPreviewCompact(
+              key: ValueKey(items.items[index - 1].id),
+              item: items.items[index - 1],
+            );
+          }
         },
       ),
     );

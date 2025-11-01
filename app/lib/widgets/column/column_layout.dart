@@ -15,7 +15,7 @@ import 'package:feeddeck/widgets/column/search/column_layout_search.dart';
 /// To use the widget a column must be set via the [column] parameter. The
 /// [openDrawer] parameter defines an optional function for large screen, to
 /// open the passed in widget in a drawer.
-class ColumnLayout extends StatelessWidget {
+class ColumnLayout extends StatefulWidget {
   const ColumnLayout({
     super.key,
     required this.column,
@@ -26,18 +26,35 @@ class ColumnLayout extends StatelessWidget {
   final void Function(Widget widget)? openDrawer;
 
   @override
+  State<ColumnLayout> createState() => _ColumnLayoutState();
+}
+
+class _ColumnLayoutState extends State<ColumnLayout> {
+  /// Whether card view mode is enabled (shows thumbnails and full content)
+  /// When false, shows compact list view (headlines only)
+  bool _isCardView = true;
+
+  void _toggleViewMode() {
+    setState(() {
+      _isCardView = !_isCardView;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider.value(
-      value: ItemsRepository(column: column),
+      value: ItemsRepository(column: widget.column),
       child: Column(
         children: [
           ColumnLayoutHeader(
-            column: column,
-            openDrawer: openDrawer,
+            column: widget.column,
+            openDrawer: widget.openDrawer,
+            isCardView: _isCardView,
+            onToggleViewMode: _toggleViewMode,
           ),
           const ColumnLayoutSearch(),
           const ColumnLayoutLoading(),
-          const ColumnLayoutList(),
+          ColumnLayoutList(isCardView: _isCardView),
         ],
       ),
     );
