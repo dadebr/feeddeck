@@ -193,7 +193,7 @@ class _DeckLayoutLargeState extends State<DeckLayoutLarge> {
                     child: Container(
                       width: Constants.columnSpacing * 3,
                       color: Colors.transparent,
-                      child: const Center(
+                      child: Center(
                         child: Container(
                           width: 2,
                           color: Constants.dividerColor,
