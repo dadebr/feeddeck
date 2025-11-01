@@ -146,72 +146,111 @@ class _DeckLayoutLargeState extends State<DeckLayoutLarge> {
         builder: (context, constraints) {
           final availableWidth = constraints.maxWidth;
           final columnCount = app.columns.length;
-          final List<Widget> widgets = [];
 
-          for (var i = 0; i < columnCount; i++) {
-            final column = app.columns[i];
-            final columnWidth = _getColumnWidth(column.id, availableWidth, columnCount);
+          if (_autoSize) {
+            // Auto-size mode: use Row with Expanded to fill available width
+            final List<Widget> widgets = [];
 
-            // Add the column
-            widgets.add(
-              AutoScrollTag(
-                key: ValueKey(column.id),
-                controller: _scrollController,
-                index: i,
-                child: Container(
-                  width: columnWidth,
-                  decoration: const BoxDecoration(
-                    border: Border(
-                      right: BorderSide(
-                        color: Colors.black,
-                        width: Constants.columnSpacing,
-                      ),
-                    ),
-                  ),
-                  child: ColumnLayout(
-                    key: ValueKey(column.id),
-                    column: column,
-                    openDrawer: _openDrawer,
-                  ),
-                ),
-              ),
-            );
+            for (var i = 0; i < columnCount; i++) {
+              final column = app.columns[i];
 
-            // Add resizable divider between columns (except after the last one)
-            if (!_autoSize && i < columnCount - 1) {
               widgets.add(
-                MouseRegion(
-                  cursor: SystemMouseCursors.resizeColumn,
-                  child: GestureDetector(
-                    onHorizontalDragUpdate: (details) {
-                      setState(() {
-                        final currentWidth = _columnWidths[column.id] ?? Constants.columnWidth;
-                        final newWidth = (currentWidth + details.delta.dx).clamp(200.0, 1000.0);
-                        _columnWidths[column.id] = newWidth;
-                      });
-                    },
+                Expanded(
+                  child: AutoScrollTag(
+                    key: ValueKey(column.id),
+                    controller: _scrollController,
+                    index: i,
                     child: Container(
-                      width: Constants.columnSpacing * 3,
-                      color: Colors.transparent,
-                      child: Center(
-                        child: Container(
-                          width: 2,
-                          color: Constants.dividerColor,
+                      decoration: const BoxDecoration(
+                        border: Border(
+                          right: BorderSide(
+                            color: Colors.black,
+                            width: Constants.columnSpacing,
+                          ),
                         ),
+                      ),
+                      child: ColumnLayout(
+                        key: ValueKey(column.id),
+                        column: column,
+                        openDrawer: _openDrawer,
                       ),
                     ),
                   ),
                 ),
               );
             }
-          }
 
-          return ListView(
-            padding: EdgeInsets.zero,
-            scrollDirection: Axis.horizontal,
-            controller: _scrollController,
-            children: widgets,
-          );
+            return Row(children: widgets);
+          } else {
+            // Manual resize mode: use Row with SizedBox and resizable dividers
+            final List<Widget> widgets = [];
+
+            for (var i = 0; i < columnCount; i++) {
+              final column = app.columns[i];
+              final columnWidth = _columnWidths[column.id] ?? Constants.columnWidth;
+
+              // Add the column
+              widgets.add(
+                AutoScrollTag(
+                  key: ValueKey(column.id),
+                  controller: _scrollController,
+                  index: i,
+                  child: SizedBox(
+                    width: columnWidth,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        border: Border(
+                          right: BorderSide(
+                            color: Colors.black,
+                            width: Constants.columnSpacing,
+                          ),
+                        ),
+                      ),
+                      child: ColumnLayout(
+                        key: ValueKey(column.id),
+                        column: column,
+                        openDrawer: _openDrawer,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+
+              // Add resizable divider between ALL columns
+              if (i < columnCount - 1) {
+                widgets.add(
+                  MouseRegion(
+                    cursor: SystemMouseCursors.resizeColumn,
+                    child: GestureDetector(
+                      onHorizontalDragUpdate: (details) {
+                        setState(() {
+                          final currentWidth = _columnWidths[column.id] ?? Constants.columnWidth;
+                          final newWidth = (currentWidth + details.delta.dx).clamp(200.0, 1000.0);
+                          _columnWidths[column.id] = newWidth;
+                        });
+                      },
+                      child: Container(
+                        width: Constants.columnSpacing * 3,
+                        color: Colors.transparent,
+                        child: Center(
+                          child: Container(
+                            width: 2,
+                            color: Constants.dividerColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }
+            }
+
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              controller: _scrollController,
+              child: Row(children: widgets),
+            );
+          }
         },
       ),
     );
