@@ -38,6 +38,22 @@ platforms. FeedDeck is written in [Flutter](https://flutter.dev/) and uses
 - **Podcasts:** Follow and listen to your favorite podcasts, via the built-in
   podcast player.
 - **YouTube:** Follow and view your favorite YouTube channels.
+- **Manual & Automatic Feed Updates:** Refresh feeds manually with a button
+  click or set up automatic updates every 15 minutes (no Docker required).
+
+## Feed Updates
+
+FeedDeck now supports both manual and automatic feed refreshing:
+
+- **Manual Refresh:** Click the refresh button in any column to fetch the latest
+  content from all sources in that column.
+- **Automatic Refresh:** Set up automatic updates using free services like
+  [cron-job.org](https://cron-job.org) or GitHub Actions. Feeds are refreshed
+  every 15 minutes automatically.
+
+For detailed setup instructions, see:
+- [FEEDS_UPDATE.md](FEEDS_UPDATE.md) - Complete guide for manual and automatic updates
+- [SETUP_CRON.md](SETUP_CRON.md) - Multiple options for automatic refresh setup
 
 ## Usage
 
