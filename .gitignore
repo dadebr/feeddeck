@@ -12,3 +12,4 @@ keys.txt
 
 # Deno
 /coverage_deno
+.env

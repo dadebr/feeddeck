@@ -60,40 +60,50 @@ No aplicativo, clique no botão de refresh (ícone de seta circular) no cabeçal
 2. Salvar novos items no banco de dados
 3. Recarregar e exibir os items atualizados
 
-### Atualização Automática
+### Atualização Automática (SEM Docker)
 
-#### Pré-requisitos
-- Docker e Docker Compose instalados
-- Arquivo `.env` configurado (copie de `.env.example`)
+Para usar Vector + Supabase, **NÃO é necessário Docker**. Use uma destas opções:
 
-#### Configuração
+#### Opção 1: Serviço Externo de Cron (RECOMENDADO - Mais Fácil)
 
-1. Copie o arquivo de exemplo de variáveis de ambiente:
-```bash
-cp .env.example .env
+Use um serviço gratuito como **cron-job.org**:
+
+1. Acesse https://cron-job.org/en/ e crie uma conta
+2. Crie um novo cron job:
+   - **URL**: `https://fycrsuukawnixmlmqenp.supabase.co/functions/v1/scheduled-feed-refresh?batch=50&max=100`
+   - **Schedule**: Every 15 minutes
+   - **Method**: POST
+   - **Headers**:
+     ```
+     Authorization: Bearer SUA-SERVICE-ROLE-KEY
+     Content-Type: application/json
+     ```
+3. Pegue a service role key em: Supabase → Settings → API → service_role key
+
+#### Opção 2: GitHub Actions (Se usar GitHub)
+
+Se seu código está no GitHub, crie `.github/workflows/refresh-feeds.yml`:
+
+```yaml
+name: Refresh Feeds
+on:
+  schedule:
+    - cron: '*/15 * * * *'  # A cada 15 minutos
+  workflow_dispatch:
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refresh Feeds
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            "https://fycrsuukawnixmlmqenp.supabase.co/functions/v1/scheduled-feed-refresh?batch=50&max=100"
 ```
 
-2. Edite o arquivo `.env` e configure:
-```env
-FEEDDECK_SUPABASE_URL=https://seu-projeto.supabase.co
-FEEDDECK_SUPABASE_SERVICE_ROLE_KEY=sua-chave-service-role
-REDIS_PASSWORD=senha-segura-aqui
-```
+Configure o secret `SUPABASE_SERVICE_ROLE_KEY` no GitHub.
 
-3. Inicie os serviços:
-```bash
-docker-compose up -d
-```
-
-4. Verifique se os serviços estão rodando:
-```bash
-docker-compose ps
-```
-
-Você deve ver 3 serviços rodando:
-- `feeddeck-redis` - Banco Redis para fila de jobs
-- `feeddeck-scheduler` - Agendador que enfileira feeds
-- `feeddeck-worker` - Worker que processa feeds (2 instâncias)
+Veja [SETUP_CRON.md](SETUP_CRON.md) para mais opções.
 
 #### Gerenciamento
 
