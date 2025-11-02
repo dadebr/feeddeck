@@ -483,4 +483,20 @@ class AppRepository with ChangeNotifier {
 
     notifyListeners();
   }
+
+  /// [refreshColumn] is called to manually refresh all sources in a column.
+  /// The function calls the `refresh-column-v1` edge function via the Supabase
+  /// client to update all sources and fetch new items for the column.
+  Future<void> refreshColumn(String columnId) async {
+    final result = await Supabase.instance.client.functions.invoke(
+      'refresh-column-v1',
+      body: {
+        'columnId': columnId,
+      },
+    );
+
+    if (result.status != 200) {
+      throw ApiException(result.data['error'], result.status);
+    }
+  }
 }

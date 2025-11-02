@@ -149,9 +149,9 @@ class _ColumnLayoutHeaderState extends State<ColumnLayoutHeader> {
             ),
           ),
           actions: [
-            /// The reload button is used to reload all items via the `reload`
-            /// function of the [ItemsRepository]. This will also reset all user
-            /// defined filters.
+            /// The reload button is used to refresh all feeds in the column via the
+            /// `refreshFeeds` function of the [ItemsRepository]. This will fetch new
+            /// feed data from all sources and reset all user defined filters.
             IconButton(
               icon: items.status == ItemsStatus.loading
                   ? Container(
@@ -166,7 +166,7 @@ class _ColumnLayoutHeaderState extends State<ColumnLayoutHeader> {
                   : const Icon(Icons.refresh, size: 20.0),
               onPressed: items.status == ItemsStatus.loading
                   ? null
-                  : () => items.reload(),
+                  : () => items.refreshFeeds(),
             ),
 
             /// The unread filter toggle button is used to quickly switch between

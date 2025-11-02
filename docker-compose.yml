@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: feeddeck-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD:-feeddeck123}
+    volumes:
+      - redis-data:/data
+    networks:
+      - feeddeck-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  scheduler:
+    build:
+      context: ./supabase/functions
+      dockerfile: _cmd/Dockerfile
+    container_name: feeddeck-scheduler
+    command: ["scheduler"]
+    environment:
+      - FEEDDECK_SUPABASE_URL=${FEEDDECK_SUPABASE_URL}
+      - FEEDDECK_SUPABASE_SERVICE_ROLE_KEY=${FEEDDECK_SUPABASE_SERVICE_ROLE_KEY}
+      - FEEDDECK_REDIS_HOSTNAME=redis
+      - FEEDDECK_REDIS_PORT=6379
+      - FEEDDECK_REDIS_USERNAME=default
+      - FEEDDECK_REDIS_PASSWORD=${REDIS_PASSWORD:-feeddeck123}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - feeddeck-network
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./supabase/functions
+      dockerfile: _cmd/Dockerfile
+    container_name: feeddeck-worker
+    command: ["worker"]
+    environment:
+      - FEEDDECK_SUPABASE_URL=${FEEDDECK_SUPABASE_URL}
+      - FEEDDECK_SUPABASE_SERVICE_ROLE_KEY=${FEEDDECK_SUPABASE_SERVICE_ROLE_KEY}
+      - FEEDDECK_REDIS_HOSTNAME=redis
+      - FEEDDECK_REDIS_PORT=6379
+      - FEEDDECK_REDIS_USERNAME=default
+      - FEEDDECK_REDIS_PASSWORD=${REDIS_PASSWORD:-feeddeck123}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - feeddeck-network
+    restart: unless-stopped
+    deploy:
+      replicas: 2  # Run 2 worker instances for better performance
+
+networks:
+  feeddeck-network:
+    driver: bridge
+
+volumes:
+  redis-data:

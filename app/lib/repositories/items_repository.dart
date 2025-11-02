@@ -275,6 +275,29 @@ class ItemsRepository with ChangeNotifier {
     await _getItems();
   }
 
+  /// [refreshFeeds] manually refreshes all sources in the column by calling the
+  /// refresh-column-v1 edge function, then reloads the items. This forces a
+  /// fetch of new feed data from the sources.
+  Future<void> refreshFeeds() async {
+    _status = ItemsStatus.loading;
+    notifyListeners();
+
+    try {
+      final app = Provider.of<AppRepository>(_context, listen: false);
+      await app.refreshColumn(column.id);
+
+      // Wait for the data to be updated in the database
+      await Future.delayed(const Duration(seconds: 3));
+
+      // Reload items after refresh
+      await reload();
+    } catch (e) {
+      // If refresh fails, just reload existing items
+      await reload();
+      rethrow;
+    }
+  }
+
   /// [updateReadState] can be used to mark the item given by the [itemId] as
   /// read or unread. When [read] is `true` the item will be marked as read and
   /// if it is `false` it will be marked as unread.
