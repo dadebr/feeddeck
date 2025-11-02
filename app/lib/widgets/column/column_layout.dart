@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:feeddeck/models/column.dart';
 import 'package:feeddeck/repositories/items_repository.dart';
@@ -33,15 +34,54 @@ class _ColumnLayoutState extends State<ColumnLayout> {
   /// Whether card view mode is enabled (shows thumbnails and full content)
   /// When false, shows compact list view (headlines only)
   bool _isCardView = true;
+  bool _isLoading = true;
 
-  void _toggleViewMode() {
+  @override
+  void initState() {
+    super.initState();
+    _loadViewPreference();
+  }
+
+  /// Load the saved view preference from SharedPreferences
+  Future<void> _loadViewPreference() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedViewMode = prefs.getBool('isCardView') ?? true;
+      setState(() {
+        _isCardView = savedViewMode;
+        _isLoading = false;
+      });
+    } catch (e) {
+      // If loading fails, use default value
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  /// Toggle view mode and save the preference
+  Future<void> _toggleViewMode() async {
     setState(() {
       _isCardView = !_isCardView;
     });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isCardView', _isCardView);
+    } catch (e) {
+      // Silently fail if saving fails
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Show a minimal loading state while loading preference
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
     return ChangeNotifierProvider(
       create: (_) => ItemsRepository(column: widget.column, context: context),
       child: Column(
