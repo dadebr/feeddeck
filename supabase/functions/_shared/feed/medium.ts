@@ -12,6 +12,7 @@ import { utils } from "../utils/index.ts";
 /**
  * `faviconFilter` is a filter function for the favicons. It filters out all the
  * favicons which are not hosted on the Medium CDN.
+/**
  */
 export const faviconFilter = (favicons: Favicon[]): Favicon[] => {
   return favicons.filter((favicon) => {
@@ -22,6 +23,7 @@ export const faviconFilter = (favicons: Favicon[]): Favicon[] => {
 /**
  * `parseMediumOption` parses the provided `medium` option and returns a valid
  * Medium feed url. The `medium` option can be a Medium url, a Medium tag or a
+/**
  * Medium username. If the provided option is not valid we throw an error.
  */
 export const parseMediumOption = (input?: string): string => {
@@ -59,6 +61,7 @@ export const parseMediumOption = (input?: string): string => {
 /**
  * `isMediumUrl` checks if the provided `url` is a valid Medium url. A url is
  * considered valid if the hostname starts with `medium.com`.
+/**
  */
 export const isMediumUrl = (url: string): boolean => {
   const parsedUrl = new URL(url);
@@ -108,7 +111,7 @@ export const getMediumFeed = async (
    * the title and link for the source.
    */
   if (source.id === "") {
-    source.id = await generateSourceId(
+    source.id = await feedutils.generateSourceId("medium", 
       source.userId,
       source.columnId,
       parsedMediumOption,
@@ -128,7 +131,7 @@ export const getMediumFeed = async (
   const items: IItem[] = [];
 
   for (const [index, entry] of feed.entries.entries()) {
-    if (skipEntry(index, entry, source.updatedAt || 0)) {
+    if (feedutils.shouldSkipEntry(index, entry, source.updatedAt || 0)) {
       continue;
     }
 
@@ -140,9 +143,9 @@ export const getMediumFeed = async (
      */
     let itemId = "";
     if (entry.id != "") {
-      itemId = await generateItemId(source.id, entry.id);
+      itemId = await feedutils.generateItemId(source.id, entry.id);
     } else if (entry.links.length > 0 && entry.links[0].href) {
-      itemId = await generateItemId(source.id, entry.links[0].href);
+      itemId = await feedutils.generateItemId(source.id, entry.links[0].href);
     } else {
       continue;
     }
@@ -170,6 +173,7 @@ export const getMediumFeed = async (
 /**
  * `skipEntry` is used to determin if an entry should be skipped or not. When a
  * entry in the RSS feed is skipped it will not be added to the database. An
+/**
  * entry will be skipped when
  * - it is not within the first 50 entries of the feed, because we only keep the
  *   last 50 items of each source in our
@@ -178,132 +182,15 @@ export const getMediumFeed = async (
  * - the published date of the entry is older than the last update date of the
  *   source minus 10 seconds.
  */
-const skipEntry = (
-  index: number,
-  entry: FeedEntry,
-  sourceUpdatedAt: number,
-): boolean => {
-  if (index === 50) {
-    return true;
-  }
-
-  if (
-    !entry.title?.value ||
-    entry.links.length === 0 ||
-    !entry.links[0].href ||
-    !entry.published
-  ) {
-    return true;
-  }
-
-  if (Math.floor(entry.published.getTime() / 1000) <= sourceUpdatedAt - 10) {
-    return true;
-  }
-
-  /**
-   * Skip entries which might be spam. To detect possible spam, we check the
-   * title of the entry against a list of words, when the title contains 3 or
-   * more of these words we consider the entry as spam.
-   */
-  const filterWords = [
-    "cash",
-    "loan",
-    "customer",
-    "care",
-    "helpline",
-    "number",
-    "patti",
-    "toll",
-    "free",
-    "paisa",
-    "call",
-    "kup",
-    "niewykrywalnych",
-    "fałszywych",
-    "pieniędzy",
-    "whatsapp",
-    "money",
-  ];
-  const title = entry.title.value.toLowerCase();
-  let score = 0;
-
-  for (const word of filterWords) {
-    if (title.includes(word)) {
-      score += 1;
-    }
-  }
-  if (score >= 3) {
-    return true;
-  }
-
-  return false;
-};
-
 /**
  * `generateSourceId` generates a unique source id based on the user id, column
  * id and the link of the RSS feed. We use the MD5 algorithm for the link to
- * generate the id.
- */
-const generateSourceId = async (
-  userId: string,
-  columnId: string,
-  link: string,
-): Promise<string> => {
-  return `medium-${userId}-${columnId}-${await utils.md5(link)}`;
-};
-
 /**
  * `generateItemId` generates a unique item id based on the source id and the
  * identifier of the item. We use the MD5 algorithm for the identifier, which
- * can be the link of the item or the id of the item.
- */
-const generateItemId = async (
-  sourceId: string,
-  identifier: string,
-): Promise<string> => {
-  return `${sourceId}-${await utils.md5(identifier)}`;
-};
-
 /**
  * `getItemDescription` returns the description of the item. If the item has a
  * `content` property we use that as our description, otherwise we use the
- * `description` property.
- */
-const getItemDescription = (entry: FeedEntry): string | undefined => {
-  if (entry.content?.value) {
-    return unescape(entry.content.value);
-  }
-
-  if (entry.description?.value) {
-    return unescape(entry.description.value);
-  }
-
-  return undefined;
-};
-
 /**
  * `getMedia` returns an image for the provided feed entry from it's content or
  * description. If we could not get an image from the content or description we
- * return `undefined`.
- */
-const getMedia = (entry: FeedEntry): string | undefined => {
-  if (entry.content?.value) {
-    const matches = /<img[^>]+\bsrc=["']([^"']+)["']/.exec(
-      unescape(entry.content.value),
-    );
-    if (matches && matches.length == 2 && matches[1].startsWith("https://")) {
-      return matches[1];
-    }
-  }
-
-  if (entry.description?.value) {
-    const matches = /<img[^>]+\bsrc=["']([^"']+)["']/.exec(
-      unescape(entry.description.value),
-    );
-    if (matches && matches.length == 2 && matches[1].startsWith("https://")) {
-      return matches[1];
-    }
-  }
-
-  return undefined;
-};

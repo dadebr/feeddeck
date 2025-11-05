@@ -80,7 +80,7 @@ export const getGooglenewsFeed = async (
    * `stackoverflow` and set the title and link for the source.
    */
   if (source.id === "") {
-    source.id = await generateSourceId(
+    source.id = await feedutils.generateSourceId("googlenews", 
       source.userId,
       source.columnId,
       source.options.googlenews.url,
@@ -100,7 +100,7 @@ export const getGooglenewsFeed = async (
   const items: IItem[] = [];
 
   for (const [index, entry] of feed.entries.entries()) {
-    if (skipEntry(index, entry, source.updatedAt || 0)) {
+    if (feedutils.shouldSkipEntry(index, entry, source.updatedAt || 0)) {
       continue;
     }
 
@@ -120,7 +120,7 @@ export const getGooglenewsFeed = async (
      * Create the item object and add it to the `items` array.
      */
     items.push({
-      id: await generateItemId(source.id, entry.id),
+      id: await feedutils.generateItemId(source.id, entry.id),
       userId: source.userId,
       columnId: source.columnId,
       sourceId: source.id,
@@ -141,6 +141,7 @@ export const getGooglenewsFeed = async (
 /**
  * `skipEntry` is used to determin if an entry should be skipped or not. When a
  * entry in the RSS feed is skipped it will not be added to the database. An
+/**
  * entry will be skipped when
  * - it is not within the first 50 entries of the feed, because we only keep the
  *   last 50 items of each source in our delete logic.
@@ -148,88 +149,12 @@ export const getGooglenewsFeed = async (
  * - the published date of the entry is older than the last update date of the
  *   source minus 10 seconds.
  */
-const skipEntry = (
-  index: number,
-  entry: FeedEntry,
-  sourceUpdatedAt: number,
-): boolean => {
-  if (index === 50) {
-    return true;
-  }
-
-  if (
-    !entry.title?.value ||
-    entry.links.length === 0 ||
-    !entry.links[0].href ||
-    !entry.published
-  ) {
-    return true;
-  }
-
-  if (Math.floor(entry.published.getTime() / 1000) <= sourceUpdatedAt - 10) {
-    return true;
-  }
-
-  return false;
-};
-
 /**
  * `generateSourceId` generates a unique source id based on the user id, column
  * id and the link of the RSS feed. We use the MD5 algorithm for the link to
- * generate the id.
- */
-const generateSourceId = async (
-  userId: string,
-  columnId: string,
-  link: string,
-): Promise<string> => {
-  return `googlenews-${userId}-${columnId}-${await utils.md5(link)}`;
-};
-
 /**
  * `generateItemId` generates a unique item id based on the source id and the
  * identifier of the item. We use the MD5 algorithm for the identifier, which
- * can be the link of the item or the id of the item.
- */
-const generateItemId = async (
-  sourceId: string,
-  identifier: string,
-): Promise<string> => {
-  return `${sourceId}-${await utils.md5(identifier)}`;
-};
-
 /**
  * `getMedia` returns the icon of the source if it exists. The icon can then be
  * used within the `item.media` field. If we are not able to get an icon for the
- * source we return `undefined`.
- *
- * To get the item we have to use the `getFavicon` function against the
- * `source.url` of the `entry`. Since this function is very expensive we cache
- * the result in Redis and check if an icon for the `source.url` is already
- * cached before we call the `getFavicon` function.
- */
-const getMedia = async (
-  redisClient: Redis,
-  entry: FeedEntry,
-): Promise<string | undefined> => {
-  try {
-    if (entry.source?.url) {
-      const cacheKey = `scraper-googlenews-${entry.source?.url}`;
-
-      const cachedMediaURL = await redisClient.get(cacheKey);
-      if (cachedMediaURL) {
-        return cachedMediaURL;
-      }
-
-      const favicon = await feedutils.getFavicon(entry.source?.url);
-      if (favicon && favicon.url.startsWith("https://")) {
-        await redisClient.set(cacheKey, favicon.url);
-        return favicon.url;
-      }
-    }
-
-    return undefined;
-  } catch (_) {
-    return undefined;
-  }
-};

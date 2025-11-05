@@ -12,6 +12,7 @@ import { utils } from "../utils/index.ts";
 /**
  * `isBoard` checks if the provided `board` is a valid 4chan board.
  * The list of boards must be synced with the list of boards in the
+/**
  * `add_source_fourchan.dart` file in the Flutter app.
  */
 const isBoard = (board: string): boolean => {
@@ -100,6 +101,7 @@ const isBoard = (board: string): boolean => {
 /**
  * `isFourChan` checks if the provided `url` is a valid 4chan url. A url is
  * considered valid if it starts with `https://boards.4chan.org/`.
+/**
  */
 export const isFourChanUrl = (url: string): boolean => {
   return url.startsWith("https://boards.4chan.org/");
@@ -157,7 +159,7 @@ export const getFourChanFeed = async (
    * of the source to `rss` and the title to the title of the feed.
    */
   if (source.id === "") {
-    source.id = await generateSourceId(
+    source.id = await feedutils.generateSourceId("fourchan", 
       source.userId,
       source.columnId,
       source.options.fourchan,
@@ -181,7 +183,7 @@ export const getFourChanFeed = async (
   const items: IItem[] = [];
 
   for (const [index, entry] of feed.entries.entries()) {
-    if (skipEntry(index, entry, source.updatedAt || 0)) {
+    if (feedutils.shouldSkipEntry(index, entry, source.updatedAt || 0)) {
       continue;
     }
 
@@ -193,9 +195,9 @@ export const getFourChanFeed = async (
      */
     let itemId = "";
     if (entry.id) {
-      itemId = await generateItemId(source.id, entry.id);
+      itemId = await feedutils.generateItemId(source.id, entry.id);
     } else {
-      itemId = await generateItemId(source.id, entry.links[0].href!);
+      itemId = await feedutils.generateItemId(source.id, entry.links[0].href!);
     }
 
     /**
@@ -221,6 +223,7 @@ export const getFourChanFeed = async (
 /**
  * `skipEntry` is used to determin if an entry should be skipped or not. When a
  * entry in the RSS feed is skipped it will not be added to the database. An
+/**
  * entry will be skipped when
  * - it is not within the first 50 entries of the feed, because we only keep the
  *   last 50 items of each source in our delete logic.
@@ -228,89 +231,15 @@ export const getFourChanFeed = async (
  * - the published date of the entry is older than the last update
  *   date of the source minus 10 seconds.
  */
-const skipEntry = (
-  index: number,
-  entry: FeedEntry,
-  sourceUpdatedAt: number,
-): boolean => {
-  if (index === 50) {
-    return true;
-  }
-
-  if (
-    !entry.title?.value ||
-    entry.links.length === 0 ||
-    !entry.links[0].href ||
-    !entry.published
-  ) {
-    return true;
-  }
-
-  if (
-    entry.published &&
-    Math.floor(entry.published.getTime() / 1000) <= sourceUpdatedAt - 10
-  ) {
-    return true;
-  }
-
-  return false;
-};
-
 /**
  * `generateSourceId` generates a unique source id based on the user id, column
  * id and the link of the RSS feed. We use the MD5 algorithm for the link to
- * generate the id.
- */
-const generateSourceId = async (
-  userId: string,
-  columnId: string,
-  link: string,
-): Promise<string> => {
-  return `fourchan-${userId}-${columnId}-${await utils.md5(link)}`;
-};
-
 /**
  * `generateItemId` generates a unique item id based on the source id and the
  * identifier of the item. We use the MD5 algorithm for the identifier, which
- * can be the link of the item or the id of the item.
- */
-const generateItemId = async (
-  sourceId: string,
-  identifier: string,
-): Promise<string> => {
-  return `${sourceId}-${await utils.md5(identifier)}`;
-};
-
 /**
  * `getItemDescription` returns the description of an item based on the provided
  * description.
- */
-const getItemDescription = (entry: FeedEntry): string | undefined => {
-  if (entry.description?.value) {
-    return unescape(entry.description?.value);
-  }
-
-  return undefined;
-};
-
 /**
  * `getMedia` returns a media url for the provided feed `entry` (item). To get
  * the media we check if the description of the entry contains an image.
- */
-const getMedia = (entry: FeedEntry): string | undefined => {
-  if (entry.description?.value) {
-    const matches = /<img[^>]+\bsrc=["']([^"']+)["']/.exec(
-      unescape(entry.description.value),
-    );
-    if (
-      matches &&
-      matches.length == 2 &&
-      (matches[1].startsWith("https://") || matches[1].startsWith("http://")) &&
-      !matches[1].endsWith(".svg")
-    ) {
-      return matches[1];
-    }
-  }
-
-  return undefined;
-};

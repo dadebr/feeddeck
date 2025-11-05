@@ -55,7 +55,7 @@ export const getPodcastFeed = async (
    * CDN url.
    */
   if (!source.id) {
-    source.id = await generateSourceId(
+    source.id = await feedutils.generateSourceId("podcast", 
       source.userId,
       source.columnId,
       source.options.podcast,
@@ -89,7 +89,7 @@ export const getPodcastFeed = async (
   const items: IItem[] = [];
 
   for (const [index, entry] of feed.entries.entries()) {
-    if (skipEntry(index, entry, source.updatedAt || 0)) {
+    if (feedutils.shouldSkipEntry(index, entry, source.updatedAt || 0)) {
       continue;
     }
 
@@ -106,9 +106,9 @@ export const getPodcastFeed = async (
      */
     let itemId = "";
     if (entry.id != "") {
-      itemId = await generateItemId(source.id, entry.id);
+      itemId = await feedutils.generateItemId(source.id, entry.id);
     } else if (entry.links && entry.links.length > 0 && entry.links[0].href) {
-      itemId = await generateItemId(source.id, entry.links[0].href);
+      itemId = await feedutils.generateItemId(source.id, entry.links[0].href);
     } else {
       continue;
     }
@@ -138,6 +138,7 @@ export const getPodcastFeed = async (
 /**
  * `skipEntry` is used to determin if an entry should be skipped or not. When a
  * entry in the RSS feed is skipped it will not be added to the database. An
+/**
  * entry will be skipped when
  * - it is not within the first 50 entries of the feed, because we only keep the
  *   last 50 items of each source in our delete logic.
@@ -145,87 +146,15 @@ export const getPodcastFeed = async (
  * - the published date of the entry is older than the last update date of the
  *   source minus 10 seconds.
  */
-const skipEntry = (
-  index: number,
-  entry: FeedEntry,
-  sourceUpdatedAt: number,
-): boolean => {
-  if (index === 50) {
-    return true;
-  }
-
-  if (!entry.title?.value || !entry.published) {
-    return true;
-  }
-
-  if (Math.floor(entry.published.getTime() / 1000) <= sourceUpdatedAt - 10) {
-    return true;
-  }
-
-  return false;
-};
-
 /**
  * `getRSSFeedFromApplePodcast` returns the RSS feed url for the provided Apple
  * Podcast id.
- */
-const getRSSFeedFromApplePodcast = async (id: string): Promise<string> => {
-  const resp = await utils.fetchWithTimeout(
-    `https://itunes.apple.com/lookup?id=${id}&entity=podcast`,
-    { method: "get" },
-    5000,
-  );
-  const podcast = await resp.json();
-
-  if (
-    !podcast ||
-    !podcast.results ||
-    podcast.results.length !== 1 ||
-    !podcast.results[0].feedUrl
-  ) {
-    throw new Error("Failed to get Apple Podcast");
-  }
-
-  return podcast.results[0].feedUrl;
-};
-
 /**
  * `generateSourceId` generates a unique source id based on the user id, column
  * id and the link of the RSS feed. We use the MD5 algorithm for the link to
- * generate the id.
- */
-const generateSourceId = async (
-  userId: string,
-  columnId: string,
-  link: string,
-): Promise<string> => {
-  return `podcast-${userId}-${columnId}-${await utils.md5(link)}`;
-};
-
 /**
  * `generateItemId` generates a unique item id based on the source id and the
  * identifier of the item. We use the MD5 algorithm for the identifier, which
- * can be the link of the item or the id of the item.
- */
-const generateItemId = async (
-  sourceId: string,
-  identifier: string,
-): Promise<string> => {
-  return `${sourceId}-${await utils.md5(identifier)}`;
-};
-
 /**
  * `getMedia` returns the mp3 file for the podcast episode. For podcast rss
  * feeds the file should be available in the attachments field.
- */
-const getMedia = (entry: FeedEntry): string | undefined => {
-  if (entry.attachments && entry.attachments.length > 0) {
-    for (const attachment of entry.attachments) {
-      if (attachment.url) {
-        return attachment.url;
-      }
-    }
-  }
-
-  return undefined;
-};

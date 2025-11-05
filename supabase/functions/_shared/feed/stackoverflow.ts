@@ -48,7 +48,7 @@ export const getStackoverflowFeed = async (
    * `stackoverflow` and set the title and link for the source.
    */
   if (source.id === "") {
-    source.id = await generateSourceId(
+    source.id = await feedutils.generateSourceId("stackoverflow", 
       source.userId,
       source.columnId,
       source.options.stackoverflow.url,
@@ -68,7 +68,7 @@ export const getStackoverflowFeed = async (
   const items: IItem[] = [];
 
   for (const [index, entry] of feed.entries.entries()) {
-    if (skipEntry(index, entry, source.updatedAt || 0)) {
+    if (feedutils.shouldSkipEntry(index, entry, source.updatedAt || 0)) {
       continue;
     }
 
@@ -76,7 +76,7 @@ export const getStackoverflowFeed = async (
      * Create the item object and add it to the `items` array.
      */
     items.push({
-      id: await generateItemId(source.id, entry.id),
+      id: await feedutils.generateItemId(source.id, entry.id),
       userId: source.userId,
       columnId: source.columnId,
       sourceId: source.id,
@@ -97,6 +97,7 @@ export const getStackoverflowFeed = async (
 /**
  * `skipEntry` is used to determin if an entry should be skipped or not. When a
  * entry in the RSS feed is skipped it will not be added to the database. An
+/**
  * entry will be skipped when
  * - it is not within the first 50 entries of the feed, because we only keep the
  *   last 50 items of each source in our delete logic.
@@ -104,52 +105,9 @@ export const getStackoverflowFeed = async (
  * - the published date of the entry is older than the last update date of the
  *   source minus 10 seconds.
  */
-const skipEntry = (
-  index: number,
-  entry: FeedEntry,
-  sourceUpdatedAt: number,
-): boolean => {
-  if (index === 50) {
-    return true;
-  }
-
-  if (
-    !entry.title?.value ||
-    entry.links.length === 0 ||
-    !entry.links[0].href ||
-    !entry.published
-  ) {
-    return true;
-  }
-
-  if (Math.floor(entry.published.getTime() / 1000) <= sourceUpdatedAt - 10) {
-    return true;
-  }
-
-  return false;
-};
-
 /**
  * `generateSourceId` generates a unique source id based on the user id, column
  * id and the link of the RSS feed. We use the MD5 algorithm for the link to
- * generate the id.
- */
-const generateSourceId = async (
-  userId: string,
-  columnId: string,
-  link: string,
-): Promise<string> => {
-  return `stackoverflow-${userId}-${columnId}-${await utils.md5(link)}`;
-};
-
 /**
  * `generateItemId` generates a unique item id based on the source id and the
  * identifier of the item. We use the MD5 algorithm for the identifier, which
- * can be the link of the item or the id of the item.
- */
-const generateItemId = async (
-  sourceId: string,
-  identifier: string,
-): Promise<string> => {
-  return `${sourceId}-${await utils.md5(identifier)}`;
-};
