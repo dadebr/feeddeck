@@ -55,7 +55,8 @@ export const getRSSFeed = async (
    * of the source to `rss` and the title to the title of the feed.
    */
   if (source.id === "") {
-    source.id = await generateSourceId(
+    source.id = await feedutils.generateSourceId(
+      "rss",
       source.userId,
       source.columnId,
       source.options.rss,
@@ -108,7 +109,13 @@ export const getRSSFeed = async (
   const items: IItem[] = [];
 
   for (const [index, entry] of feed.entries.entries()) {
-    if (skipEntry(index, entry, source.updatedAt || 0)) {
+    if (feedutils.shouldSkipEntry(index, entry, source.updatedAt || 0)) {
+      continue;
+    }
+
+    // Additional validation for RSS-specific required fields
+    if (!entry.title?.value) {
+      feedutils.logSkippedEntry("Missing title", entry, index);
       continue;
     }
 
@@ -120,9 +127,9 @@ export const getRSSFeed = async (
      */
     let itemId = "";
     if (entry.id) {
-      itemId = await generateItemId(source.id, entry.id);
+      itemId = await feedutils.generateItemId(source.id, entry.id);
     } else {
-      itemId = await generateItemId(source.id, entry.links[0].href!);
+      itemId = await feedutils.generateItemId(source.id, entry.links[0].href!);
     }
 
     /**
@@ -144,13 +151,8 @@ export const getRSSFeed = async (
       options: video ? { video: video } : undefined,
       description: getItemDescription(entry),
       author: entry.author?.name,
-      publishedAt: entry.published
-        ? Math.floor(entry.published.getTime() / 1000)
-        : entry.updated
-          ? Math.floor(entry.updated.getTime() / 1000)
-          : entry["dc:date"]
-            ? getDCDateTimestamp(entry["dc:date"])
-            : Math.floor(new Date().getTime() / 1000),
+      publishedAt: feedutils.getEntryTimestamp(entry) ||
+        Math.floor(new Date().getTime() / 1000),
     });
   }
 
@@ -173,7 +175,11 @@ const getFeed = async (
       feedData,
     );
     return feed;
-  } catch (_) {
+  } catch (err) {
+    utils.log("debug", "Failed to parse RSS feed", {
+      error: err instanceof Error ? err.message : String(err),
+      url: source.options?.rss,
+    });
     return undefined;
   }
 };
@@ -217,96 +223,15 @@ const getFeedFromWebsite = async (
     source.options!.rss = new URL(rssLink, source.options!.rss!).href;
 
     return getFeed(source, undefined);
-  } catch (_) {
+  } catch (err) {
+    utils.log("debug", "Failed to get RSS feed from website", {
+      error: err instanceof Error ? err.message : String(err),
+      url: source.options?.rss,
+    });
     return undefined;
   }
 };
 
-/**
- * `skipEntry` is used to determin if an entry should be skipped or not. When a
- * entry in the RSS feed is skipped it will not be added to the database. An
- * entry will be skipped when
- * - it is not within the first 50 entries of the feed, because we only keep the
- *   last 50 items of each source in our delete logic.
- * - the entry does not contain a title, a link or a published / updated date.
- * - the published / updated date of the entry is older than the last update
- *   date of the source minus 10 seconds.
- */
-const skipEntry = (
-  index: number,
-  entry: FeedEntry,
-  sourceUpdatedAt: number,
-): boolean => {
-  if (index === 50) {
-    return true;
-  }
-
-  if (
-    !entry.title?.value ||
-    entry.links.length === 0 ||
-    !entry.links[0].href ||
-    (!entry.published && !entry.updated && !entry["dc:date"])
-  ) {
-    return true;
-  }
-
-  if (
-    entry.published &&
-    Math.floor(entry.published.getTime() / 1000) <= sourceUpdatedAt - 10
-  ) {
-    return true;
-  } else if (
-    entry.updated &&
-    Math.floor(entry.updated.getTime() / 1000) <= sourceUpdatedAt - 10
-  ) {
-    return true;
-  } else if (
-    entry["dc:date"] &&
-    getDCDateTimestamp(entry["dc:date"]) <= sourceUpdatedAt - 10
-  ) {
-    return true;
-  }
-
-  return false;
-};
-
-/**
- * `getDCDateTimestamp` is a helper function to get the timestamp of a `dc:date`
- * tag. The `dc:date` tag can either be a `Date` object or an object with a
- * `value` property which is a `Date` object.
- */
-const getDCDateTimestamp = (dcdate: Date | { value: Date }): number => {
-  if (dcdate instanceof Date) {
-    return Math.floor(dcdate.getTime() / 1000);
-  } else {
-    return Math.floor(dcdate.value.getTime() / 1000);
-  }
-};
-
-/**
- * `generateSourceId` generates a unique source id based on the user id, column
- * id and the link of the RSS feed. We use the MD5 algorithm for the link to
- * generate the id.
- */
-const generateSourceId = async (
-  userId: string,
-  columnId: string,
-  link: string,
-): Promise<string> => {
-  return `rss-${userId}-${columnId}-${await utils.md5(link)}`;
-};
-
-/**
- * `generateItemId` generates a unique item id based on the source id and the
- * identifier of the item. We use the MD5 algorithm for the identifier, which
- * can be the link of the item or the id of the item.
- */
-const generateItemId = async (
-  sourceId: string,
-  identifier: string,
-): Promise<string> => {
-  return `${sourceId}-${await utils.md5(identifier)}`;
-};
 
 /**
  * `getItemDescription` returns the description of an item based on the provided

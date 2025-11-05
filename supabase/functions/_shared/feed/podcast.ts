@@ -5,6 +5,7 @@ import { unescape } from "https://raw.githubusercontent.com/lodash/lodash/4.17.2
 
 import { ISource } from "../models/source.ts";
 import { IItem } from "../models/item.ts";
+import { PodcastFeed } from "../models/feed-extensions.ts";
 import { feedutils } from "./utils/index.ts";
 import { IProfile } from "../models/profile.ts";
 import { utils } from "../utils/index.ts";
@@ -69,11 +70,13 @@ export const getPodcastFeed = async (
     if (feed.image?.url) {
       source.icon = feed.image.url;
       source.icon = await feedutils.uploadSourceIcon(supabaseClient, source);
-      // deno-lint-ignore no-explicit-any
-    } else if ((feed as any)["itunes:image"]?.href) {
-      // deno-lint-ignore no-explicit-any
-      source.icon = (feed as any)["itunes:image"].href;
-      source.icon = await feedutils.uploadSourceIcon(supabaseClient, source);
+    } else {
+      // Try to get iTunes podcast image using proper typing
+      const podcastFeed = feed as PodcastFeed;
+      if (podcastFeed["itunes:image"]?.href) {
+        source.icon = podcastFeed["itunes:image"].href;
+        source.icon = await feedutils.uploadSourceIcon(supabaseClient, source);
+      }
     }
   }
 

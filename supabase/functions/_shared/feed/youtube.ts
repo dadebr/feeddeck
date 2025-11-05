@@ -5,6 +5,7 @@ import { unescape } from "https://raw.githubusercontent.com/lodash/lodash/4.17.2
 
 import { IItem } from "../models/item.ts";
 import { ISource } from "../models/source.ts";
+import { YoutubeFeedEntry } from "../models/feed-extensions.ts";
 import { feedutils } from "./utils/index.ts";
 import { IProfile } from "../models/profile.ts";
 import { FEEDDECK_SOURCE_YOUTUBE_API_KEY } from "../utils/constants.ts";
@@ -98,7 +99,8 @@ export const getYoutubeFeed = async (
    * set the title and link for the source.
    */
   if (source.id === "") {
-    source.id = await generateSourceId(
+    source.id = await feedutils.generateSourceId(
+      "youtube",
       source.userId,
       source.columnId,
       source.options.youtube,
@@ -117,7 +119,18 @@ export const getYoutubeFeed = async (
   const items: IItem[] = [];
 
   for (const [index, entry] of feed.entries.entries()) {
-    if (skipEntry(index, entry, source.updatedAt || 0)) {
+    if (feedutils.shouldSkipEntry(index, entry, source.updatedAt || 0)) {
+      continue;
+    }
+
+    // Additional validation for YouTube-specific required fields
+    if (!entry.title?.value) {
+      feedutils.logSkippedEntry("Missing title", entry, index);
+      continue;
+    }
+
+    if (!entry.published) {
+      feedutils.logSkippedEntry("Missing published date", entry, index);
       continue;
     }
 
@@ -129,10 +142,11 @@ export const getYoutubeFeed = async (
      */
     let itemId = "";
     if (entry.id != "") {
-      itemId = await generateItemId(source.id, entry.id);
+      itemId = await feedutils.generateItemId(source.id, entry.id);
     } else if (entry.links.length > 0 && entry.links[0].href) {
-      itemId = await generateItemId(source.id, entry.links[0].href);
+      itemId = await feedutils.generateItemId(source.id, entry.links[0].href);
     } else {
+      feedutils.logSkippedEntry("Missing ID and link", entry, index);
       continue;
     }
 
@@ -158,73 +172,15 @@ export const getYoutubeFeed = async (
   return { source, items };
 };
 
-/**
- * `skipEntry` is used to determin if an entry should be skipped or not. When a
- * entry in the RSS feed is skipped it will not be added to the database. An
- * entry will be skipped when
- * - it is not within the first 50 entries of the feed, because we only keep the
- *   last 50 items of each source in our delete logic.
- * - the entry does not contain a title, a link or a published date.
- * - the published date of the entry is older than the last update date of the
- *   source minus 10 seconds.
- */
-const skipEntry = (
-  index: number,
-  entry: FeedEntry,
-  sourceUpdatedAt: number,
-): boolean => {
-  if (index === 50) {
-    return true;
-  }
-
-  if (
-    !entry.title?.value ||
-    entry.links.length === 0 ||
-    !entry.links[0].href ||
-    !entry.published
-  ) {
-    return true;
-  }
-
-  if (Math.floor(entry.published.getTime() / 1000) <= sourceUpdatedAt - 10) {
-    return true;
-  }
-
-  return false;
-};
-
-/**
- * `generateSourceId` generates a unique source id based on the user id, column
- * id and the link of the RSS feed. We use the MD5 algorithm for the link to
- * generate the id.
- */
-const generateSourceId = async (
-  userId: string,
-  columnId: string,
-  link: string,
-): Promise<string> => {
-  return `youtube-${userId}-${columnId}-${await utils.md5(link)}`;
-};
-
-/**
- * `generateItemId` generates a unique item id based on the source id and the
- * identifier of the item. We use the MD5 algorithm for the identifier, which
- * can be the link of the item or the id of the item.
- */
-const generateItemId = async (
-  sourceId: string,
-  identifier: string,
-): Promise<string> => {
-  return `${sourceId}-${await utils.md5(identifier)}`;
-};
 
 /**
  * `getDescription` returns the description for a feed entry. If the entry does
  * not contain a description we return `undefined`.
  */
 const getDescription = (entry: FeedEntry): string | undefined => {
-  if (entry["media:group"] && entry["media:group"]["media:description"]) {
-    return unescape(entry["media:group"]["media:description"].value);
+  const youtubeEntry = entry as YoutubeFeedEntry;
+  if (youtubeEntry["media:group"]?.["media:description"]) {
+    return unescape(youtubeEntry["media:group"]["media:description"].value);
   }
 
   return undefined;
@@ -236,13 +192,9 @@ const getDescription = (entry: FeedEntry): string | undefined => {
  * not the video itself, because the video can be get using the entry link.
  */
 const getMedia = (entry: FeedEntry): string | undefined => {
-  if (
-    entry["media:group"] &&
-    // deno-lint-ignore no-explicit-any
-    (entry["media:group"] as any)["media:thumbnail"]
-  ) {
-    // deno-lint-ignore no-explicit-any
-    return (entry["media:group"] as any)["media:thumbnail"].url;
+  const youtubeEntry = entry as YoutubeFeedEntry;
+  if (youtubeEntry["media:group"]?.["media:thumbnail"]) {
+    return youtubeEntry["media:group"]["media:thumbnail"].url;
   }
 
   return undefined;
@@ -264,7 +216,11 @@ const getChannelId = async (url: string): Promise<string | undefined> => {
       return match[1];
     }
     return undefined;
-  } catch (_) {
+  } catch (err) {
+    utils.log("debug", "Failed to get YouTube channel ID", {
+      error: err instanceof Error ? err.message : String(err),
+      url,
+    });
     return undefined;
   }
 };
@@ -298,7 +254,12 @@ const getChannelIcon = async (
     ) {
       return json.items[0].snippet.thumbnails.default.url;
     }
-  } catch (_) {
+    return undefined;
+  } catch (err) {
+    utils.log("debug", "Failed to get YouTube channel icon", {
+      error: err instanceof Error ? err.message : String(err),
+      channelId,
+    });
     return undefined;
   }
 };
