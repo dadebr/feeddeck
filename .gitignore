@@ -13,3 +13,5 @@ keys.txt
 # Deno
 /coverage_deno
 .env
+# Backup files
+*.old

@@ -16,11 +16,27 @@ export interface FeedParserConfig {
    * @default 10
    */
   timeBuffer?: number;
+
+  /**
+   * Enable pagination support for large feeds
+   * When enabled, the maxItems limit can be exceeded if needed
+   * @default false
+   */
+  enablePagination?: boolean;
+
+  /**
+   * Pagination cursor for resuming from a specific point
+   * This is source-specific and can be a timestamp, ID, or offset
+   * @default undefined
+   */
+  paginationCursor?: string;
 }
 
-const DEFAULT_CONFIG: Required<FeedParserConfig> = {
+const DEFAULT_CONFIG: FeedParserConfig = {
   maxItems: 50,
   timeBuffer: 10,
+  enablePagination: false,
+  paginationCursor: undefined,
 };
 
 /**
